@@ -251,6 +251,80 @@ func (code *Code) GenAST() (*ast.File, error) {
 			file.Decls = append(file.Decls, f)
 		}
 	}
+
+	miscMethods := []*ast.FuncDecl{
+		gen.Func("GetInt").
+			//Receiver("t *"+name).
+			Args("value int").
+			Returns("* int").
+			Body("return &value").
+			MustDecl(),
+		gen.Func("GetString").
+			//Receiver("t *"+name).
+			Args("value string").
+			Returns("* string").
+			Body("return &value").
+			MustDecl(),
+		gen.Func("GetFloat64").
+			//Receiver("t *"+name).
+			Args("value float64").
+			Returns("* float64").
+			Body("return &value").
+			MustDecl(),
+		gen.Func("GetBool").
+			//Receiver("t *"+name).
+			Args("value bool").
+			Returns("* bool").
+			Body("return &value").
+			MustDecl(),
+		gen.Func("GetXsdDateTime").
+			//Receiver("t *"+name).
+			Args("value time.Time").
+			Returns("* XsdDateTime").
+			Body(`convTime := XsdDateTime(value)
+	      return &convTime`).
+			MustDecl(),
+		gen.Func("GetXsdDate").
+			//Receiver("t *"+name).
+			Args("value time.Time").
+			Returns("* XsdDate").
+			Body(`convTime := XsdDate(value)
+	      return &convTime`).
+			MustDecl(),
+		gen.Func("GetXsdTime").
+			//Receiver("t *"+name).
+			Args("value time.Time").
+			Returns("* XsdTime").
+			Body(`convTime := XsdTime(value)
+	      return &convTime`).
+			MustDecl(),
+		gen.Func("UnmarshalJSON").
+			Receiver("ext *Extensions").
+			Args("b []byte").
+			Returns("error").
+			Body(`err := json.Unmarshal(b, &ext.InnerXml)
+        if err != nil {
+          return err
+        }
+        return nil`).
+			MustDecl(),
+		gen.Func("MarshalJSON").
+			Receiver("ext *Extensions").
+			//Args("text []byte").
+			Returns("[]byte", "error").
+			Body(`buffer := &bytes.Buffer{}
+        encoder := json.NewEncoder(buffer)
+        encoder.SetEscapeHTML(false)
+        err := encoder.Encode(ext.InnerXml)
+        return buffer.Bytes(), err`).
+			MustDecl(),
+	}
+
+	for _, meth := range miscMethods {
+		file.Decls = append(file.Decls, meth)
+
+	}
+
 	pkgname := code.cfg.pkgname
 	if pkgname == "" {
 		pkgname = "ws"
@@ -313,31 +387,31 @@ func (cfg *Config) expandComplexTypes(types []xsd.Type) []xsd.Type {
 		cfg.debugf("complexType %s: expanding base %s fields",
 			c.Name.Local, b.Name.Local)
 
-		shadowedElements := make(map[xml.Name]struct{})
-		shadowedAttributes := make(map[xml.Name]struct{})
-
+		complexTypeElements := make(map[xml.Name]struct{})
 		for _, el := range c.Elements {
-			shadowedElements[el.Name] = struct{}{}
+			complexTypeElements[el.Name] = struct{}{}
 		}
-		for _, attr := range c.Attributes {
-			shadowedAttributes[attr.Name] = struct{}{}
-		}
+		var nonOverriddenBaseElements []xsd.Element
 		for _, el := range b.Elements {
-			if _, ok := shadowedElements[el.Name]; !ok {
-				c.Elements = append(c.Elements, el)
-			} else {
-				cfg.debugf("complexType %s: extended element %s is overrided",
-					c.Name.Local, el.Name.Local)
+			if _, exists := complexTypeElements[el.Name]; !exists {
+				nonOverriddenBaseElements = append(nonOverriddenBaseElements, el)
 			}
 		}
+		newElArray := append(nonOverriddenBaseElements, c.Elements...)
+		c.Elements = newElArray
+
+		complexTypeAtts := make(map[xml.Name]struct{})
+		for _, attr := range c.Attributes {
+			complexTypeAtts[attr.Name] = struct{}{}
+		}
+		var nonOverriddenBaseAttributes []xsd.Attribute
 		for _, attr := range b.Attributes {
-			if _, ok := shadowedAttributes[attr.Name]; !ok {
-				c.Attributes = append(c.Attributes, attr)
-			} else {
-				cfg.debugf("complexType %s: extended attribute %s is overrided",
-					c.Name.Local, attr.Name.Local)
+			if _, exists := complexTypeAtts[attr.Name]; !exists {
+				nonOverriddenBaseAttributes = append(nonOverriddenBaseAttributes, attr)
 			}
 		}
+		newAttrArray := append(nonOverriddenBaseAttributes, c.Attributes...)
+		c.Attributes = newAttrArray
 
 		for base := c.Base; base != nil; base = xsd.Base(base) {
 			if _, ok := base.(*xsd.ComplexType); !ok {
@@ -676,10 +750,64 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 	cfg.debugf("complexType %s: generating struct fields for %d elements and %d attributes",
 		xsd.XMLName(t).Local, len(elements), len(attributes))
 
+	for _, attr := range attributes {
+		options := ""
+		jsonOptions := ""
+		if attr.Optional {
+			options = ",omitempty"
+			jsonOptions = ",omitempty"
+		}
+		qualified := false
+		for _, attrAttr := range attr.Attr {
+			if attrAttr.Name.Space == "" && attrAttr.Name.Local == "form" && attrAttr.Value == "qualified" {
+				qualified = true
+			}
+		}
+		var tag string
+		if qualified {
+			tag = fmt.Sprintf(`xml:"%s %s,attr%s"`, attr.Name.Space, attr.Name.Local, options)
+		} else {
+			tag = fmt.Sprintf(`xml:"%s,attr%s"`, attr.Name.Local, options)
+		}
+		if jsonOptions != "" {
+			tag += fmt.Sprintf(` json:"%s"`, jsonOptions)
+		}
+		base, err := cfg.expr(attr.Type)
+		if err != nil {
+			return nil, fmt.Errorf("%s attribute %s: %v", t.Name.Local, attr.Name.Local, err)
+		}
+		cfg.debugf("adding %s attribute %s as %v", t.Name.Local, attr.Name.Local, base)
+		name := namegen.attribute(attr.Name)
+
+		if attr.Default != "" || nonTrivialBuiltin(attr.Type) {
+			typeName := cfg.exprString(attr.Type)
+			if nonTrivialBuiltin(attr.Type) {
+				h, ok := cfg.helperTypes[xsd.XMLName(attr.Type)]
+				if !ok {
+					return nil, fmt.Errorf("no helper type for type %v attribute %v", t.Name, attr.Name)
+				}
+				typeName = h.name
+				helperTypes = append(helperTypes, xsd.XMLName(attr.Type))
+			}
+			base = &ast.Ident{Name: typeName} //instead of using overrides, just set the type directly
+			//overrides = append(overrides, fieldOverride{
+			//	DefaultValue: attr.Default,
+			//	FieldName:    name.(*ast.Ident).Name,
+			//	FromType:     cfg.exprString(attr.Type),
+			//	Tag:          tag,
+			//	ToType:       typeName,
+			//	Type:         attr.Type,
+			//})
+		}
+		fields = append(fields, name, base, gen.String(tag))
+	}
+
 	for _, el := range elements {
 		options := ""
+		jsonOptions := ""
 		if el.Nillable || el.Optional {
 			options = ",omitempty"
+			jsonOptions = ",omitempty"
 		}
 		tag := fmt.Sprintf(`xml:"%s %s%s"`, el.Name.Space, el.Name.Local, options)
 		base, err := cfg.expr(el.Type)
@@ -699,10 +827,13 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 				base = builtinExpr(xsd.String)
 			}
 		}
+		if jsonOptions != "" {
+			tag += fmt.Sprintf(` json:"%s"`, jsonOptions)
+		}
 		if el.Plural {
 			base = &ast.ArrayType{Elt: base}
 		}
-		fields = append(fields, name, base, gen.String(tag))
+
 		if el.Default != "" || nonTrivialBuiltin(el.Type) {
 			typeName := cfg.exprString(el.Type)
 			if nonTrivialBuiltin(el.Type) {
@@ -713,60 +844,19 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 				helperTypes = append(helperTypes, xsd.XMLName(h.xsdType))
 				typeName = h.name
 			}
-			overrides = append(overrides, fieldOverride{
-				DefaultValue: el.Default,
-				FieldName:    name.(*ast.Ident).Name,
-				FromType:     cfg.exprString(el.Type),
-				Tag:          tag,
-				ToType:       typeName,
-				Type:         el.Type,
-			})
+			base = &ast.Ident{Name: typeName} //instead of using overrides, just set the type directly
+			//overrides = append(overrides, fieldOverride{
+			//	DefaultValue: el.Default,
+			//	FieldName:    name.(*ast.Ident).Name,
+			//	FromType:     cfg.exprString(el.Type),
+			//	Tag:          tag,
+			//	ToType:       typeName,
+			//	Type:         el.Type,
+			//})
 		}
-	}
-	for _, attr := range attributes {
-		options := ""
-		if attr.Optional {
-			options = ",omitempty"
-		}
-		qualified := false
-		for _, attrAttr := range attr.Attr {
-			if attrAttr.Name.Space == "" && attrAttr.Name.Local == "form" && attrAttr.Value == "qualified" {
-				qualified = true
-			}
-		}
-		var tag string
-		if qualified {
-			tag = fmt.Sprintf(`xml:"%s %s,attr%s"`, attr.Name.Space, attr.Name.Local, options)
-		} else {
-			tag = fmt.Sprintf(`xml:"%s,attr%s"`, attr.Name.Local, options)
-		}
-		base, err := cfg.expr(attr.Type)
-		if err != nil {
-			return nil, fmt.Errorf("%s attribute %s: %v", t.Name.Local, attr.Name.Local, err)
-		}
-		cfg.debugf("adding %s attribute %s as %v", t.Name.Local, attr.Name.Local, base)
-		name := namegen.attribute(attr.Name)
 		fields = append(fields, name, base, gen.String(tag))
-		if attr.Default != "" || nonTrivialBuiltin(attr.Type) {
-			typeName := cfg.exprString(attr.Type)
-			if nonTrivialBuiltin(attr.Type) {
-				h, ok := cfg.helperTypes[xsd.XMLName(attr.Type)]
-				if !ok {
-					return nil, fmt.Errorf("no helper type for type %v attribute %v", t.Name, attr.Name)
-				}
-				typeName = h.name
-				helperTypes = append(helperTypes, xsd.XMLName(attr.Type))
-			}
-			overrides = append(overrides, fieldOverride{
-				DefaultValue: attr.Default,
-				FieldName:    name.(*ast.Ident).Name,
-				FromType:     cfg.exprString(attr.Type),
-				Tag:          tag,
-				ToType:       typeName,
-				Type:         attr.Type,
-			})
-		}
 	}
+
 	expr := gen.Struct(fields...)
 	s := spec{
 		doc:         t.Doc,
@@ -775,19 +865,21 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 		xsdType:     t,
 		helperTypes: helperTypes,
 	}
-	if len(overrides) > 0 {
-		unmarshal, marshal, err := cfg.genComplexTypeMethods(t, overrides)
-		if err != nil {
-			return result, err
-		} else {
-			if unmarshal != nil {
-				s.methods = append(s.methods, unmarshal)
-			}
-			if marshal != nil {
-				s.methods = append(s.methods, marshal)
-			}
-		}
-	}
+	//not using overrides in this way since it causes invalid XML to be generated
+
+	//if len(overrides) > 0 {
+	//	unmarshal, marshal, err := cfg.genComplexTypeMethods(t, overrides)
+	//	if err != nil {
+	//		return result, err
+	//	} else {
+	//		if unmarshal != nil {
+	//			s.methods = append(s.methods, unmarshal)
+	//		}
+	//		if marshal != nil {
+	//			s.methods = append(s.methods, marshal)
+	//		}
+	//	}
+	//}
 	result = append(result, s)
 	return result, nil
 }

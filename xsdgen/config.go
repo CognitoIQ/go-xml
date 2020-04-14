@@ -40,6 +40,8 @@ type Config struct {
 	// if populated, only types that are true in this map
 	// will be selected.
 	allowTypes map[xml.Name]bool
+
+	miscFunctions []spec
 }
 
 type typeTransform func(xsd.Schema, xsd.Type) xsd.Type
@@ -74,9 +76,12 @@ var DefaultOptions = []Option{
 	Replace(`[._ \s-]`, ""),
 	PackageName("ws"),
 	HandleSOAPArrayType(),
-	SOAPArrayAsSlice(),
+	//SOAPArrayAsSlice(),
+	DefaultConverterOption(),
 	UseFieldNames(),
 }
+
+//make cognito options?
 
 // The Namespaces option configures the code generation process
 // to only generate code for types declared in the configured target
@@ -409,6 +414,18 @@ func SOAPArrayAsSlice() Option {
 	}
 }
 
+func DefaultConverterOption() Option {
+	return func(cfg *Config) Option {
+		prev := cfg.postprocessType
+		return replacePostprocessType(&cfg.postprocessType, func(s spec) spec {
+			if prev != nil {
+				s = prev(s)
+			}
+			return cfg.postProcessor(s)
+		})(cfg)
+	}
+}
+
 func (cfg *Config) filterFields(t *xsd.ComplexType) ([]xsd.Attribute, []xsd.Element) {
 	var (
 		elements   []xsd.Element
@@ -615,7 +632,9 @@ func (cfg *Config) addStandardHelpers() {
 	}
 
 	for timeType, timeSpec := range timeTypes {
-		name := "xsd" + timeType.String()
+		//name := "xsd" + timeType.String()
+		name := "Xsd" + timeType.String()
+
 		cfg.helperTypes[xsd.XMLName(timeType)] = spec{
 			name:    name,
 			expr:    builtinExpr(timeType),
@@ -647,6 +666,23 @@ func (cfg *Config) addStandardHelpers() {
 							return err
 						}
 						return e.EncodeElement(m, start)
+					`).MustDecl(),
+				gen.Func("MarshalJSON").
+					Receiver("t "+name).
+					//Args("e *xml.Encoder", "start xml.StartElement").
+					Returns("[]byte", "error").
+					Body(`
+            var buf bytes.Buffer
+						if (time.Time)(t).IsZero() {
+							buf.WriteString("null")
+		          return buf.Bytes(), nil
+						}
+						m, err := t.MarshalText()
+						if err != nil {
+							return nil, err
+						}
+            buf.WriteString("\"" + string(m) + "\"")
+	          return buf.Bytes(), nil
 					`).MustDecl(),
 				gen.Func("MarshalXMLAttr").
 					Receiver("t "+name).
@@ -716,6 +752,91 @@ func (cfg *Config) addStandardHelpers() {
 				`).MustDecl(),
 		},
 	}
+}
+
+func (cfg *Config) postProcessor(s spec) spec {
+	s = cfg.convertExtensions(s)
+	return cfg.soapArrayToSlice(s)
+}
+func (cfg *Config) convertExtensions(s spec) spec {
+	str, ok := s.expr.(*ast.StructType)
+	if !ok {
+		return s
+	}
+	str = str
+	if s.name == "Extensions" {
+		fmt.Println("Extensions")
+
+		tag := gen.String(`xml:",innerxml"`)
+		expr := gen.Struct(ast.NewIdent("InnerXml"), &ast.Ident{Name: "string"}, tag)
+
+		s = spec{
+			name:    "Extensions",
+			expr:    expr,
+			private: false,
+			//	//xsdType: timeType,
+			//	//		methods: []*ast.FuncDecl{
+			//	//			gen.Func("MarshalJSON").
+			//	//				Receiver("ext *Extensions").
+			//	//				//Args("text []byte").
+			//	//				Returns("[]byte", "error").
+			//	//				Body(`buffer := &bytes.Buffer{}
+			//	//encoder := json.NewEncoder(buffer)
+			//	//encoder.SetEscapeHTML(false)
+			//	//err := encoder.Encode(ext.InnerXml)
+			//	//return buffer.Bytes(), err`).
+			//	//				MustDecl(),
+			//	//		},
+		}
+	}
+	return s
+	//extensionsSpec := spec{
+	//	name:    "Extensions",
+	//	expr:    builtinExpr(timeType),
+	//	private: true,
+	//	xsdType: timeType,
+	//	methods: []*ast.FuncDecl{
+	//		gen.Func("UnmarshalText").
+	//			Receiver("t *"+name).
+	//			Args("text []byte").
+	//			Returns("error").
+	//			Body(`return _unmarshalTime(text, (*time.Time)(t), %q)`, timeSpec).
+	//			MustDecl(),
+	//		gen.Func("MarshalText").
+	//			Receiver("t "+name).
+	//			Returns("[]byte", "error").
+	//			Body(`return []byte((time.Time)(t).Format(%q)), nil`, timeSpec).
+	//			MustDecl(),
+	//		// workaround golang.org/issues/11939
+	//		gen.Func("MarshalXML").
+	//			Receiver("t "+name).
+	//			Args("e *xml.Encoder", "start xml.StartElement").
+	//			Returns("error").
+	//			Body(`
+	//				if (time.Time)(t).IsZero() {
+	//					return nil
+	//				}
+	//				m, err := t.MarshalText()
+	//				if err != nil {
+	//					return err
+	//				}
+	//				return e.EncodeElement(m, start)
+	//			`).MustDecl(),
+	//		gen.Func("MarshalXMLAttr").
+	//			Receiver("t "+name).
+	//			Args("name xml.Name").
+	//			Returns("xml.Attr", "error").
+	//			Body(`
+	//				if (time.Time)(t).IsZero() {
+	//					return xml.Attr{}, nil
+	//				}
+	//				m, err := t.MarshalText()
+	//				return xml.Attr{Name: name, Value: string(m)}, err
+	//			`).MustDecl(),
+	//	},
+	//	helperFuncs: []string{"_unmarshalTime"},
+	//}
+
 }
 
 // SOAP arrays (and other similar types) are complex types with a single

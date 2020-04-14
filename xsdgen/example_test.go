@@ -2,11 +2,10 @@ package xsdgen_test
 
 import (
 	"fmt"
+	"github.com/CognitoIQ/go-xml/xsdgen"
 	"io/ioutil"
 	"log"
 	"os"
-
-	"github.com/CognitoIQ/go-xml/xsdgen"
 )
 
 func tmpfile() *os.File {
@@ -76,9 +75,54 @@ func ExampleIgnoreAttributes() {
 
 	// Output: package ws
 	//
-	// type ArrayOfString struct {
-	// 	Items []string `xml:",any"`
-	// }
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"time"
+	//)
+	//
+	//type ArrayOfString struct {
+	//	Items []*string `xml:",any"`
+	//}
+	//
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 }
 
 func ExampleIgnoreElements() {
@@ -104,10 +148,55 @@ func ExampleIgnoreElements() {
 
 	// Output: package ws
 	//
-	// type Person struct {
-	// 	Name     string `xml:"http://www.example.com/ name"`
-	// 	Deceased bool   `xml:"http://schemas.xmlsoap.org/soap/encoding/ deceased"`
-	// }
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"time"
+	//)
+	//
+	//type Person struct {
+	//	Name     *string `xml:"http://www.example.com/ name"`
+	//	Deceased *bool   `xml:"http://schemas.xmlsoap.org/soap/encoding/ deceased"`
+	//}
+	//
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 }
 
 func ExamplePackageName() {
@@ -129,8 +218,53 @@ func ExamplePackageName() {
 
 	// Output: package postal
 	//
-	// // May be no more than 10 items long
-	// type Zipcode string
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"time"
+	//)
+	//
+	//// May be no more than 10 items long
+	//type Zipcode *string
+	//
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 }
 
 func ExampleReplace() {
@@ -151,10 +285,55 @@ func ExampleReplace() {
 
 	// Output: package ws
 	//
-	// type StringArray struct {
-	// 	Items     []string `xml:",any"`
-	// 	ArrayType string   `xml:"arrayType,attr,omitempty"`
-	// }
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"time"
+	//)
+	//
+	//type StringArray struct {
+	//	ArrayType *string   `xml:"arrayType,attr,omitempty" json:",omitempty"`
+	//	Items     []*string `xml:",any"`
+	//}
+	//
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 }
 
 func ExampleHandleSOAPArrayType() {
@@ -178,12 +357,57 @@ func ExampleHandleSOAPArrayType() {
 
 	// Output: package ws
 	//
-	// type BoolArray struct {
-	// 	Items  []bool `xml:",any"`
-	// 	Offset string `xml:"offset,attr,omitempty"`
-	// 	Id     string `xml:"id,attr,omitempty"`
-	// 	Href   string `xml:"href,attr,omitempty"`
-	// }
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"time"
+	//)
+	//
+	//type BoolArray struct {
+	//	Offset *string `xml:"offset,attr,omitempty" json:",omitempty"`
+	//	Id     string  `xml:"id,attr,omitempty" json:",omitempty"`
+	//	Href   string  `xml:"href,attr,omitempty" json:",omitempty"`
+	//	Items  []*bool `xml:",any"`
+	//}
+	//
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 }
 
 func ExampleSOAPArrayAsSlice() {
@@ -212,35 +436,78 @@ func ExampleSOAPArrayAsSlice() {
 
 	// Output: package ws
 	//
-	// import "encoding/xml"
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"encoding/xml"
+	//	"time"
+	//)
 	//
-	// type BoolArray []bool
+	//type BoolArray []*bool
 	//
-	// func (a BoolArray) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	// 	var output struct {
-	// 		ArrayType string `xml:"http://schemas.xmlsoap.org/wsdl/ arrayType,attr"`
-	// 		Items     []bool `xml:" item"`
-	// 	}
-	// 	output.Items = []bool(a)
-	// 	start.Attr = append(start.Attr, xml.Attr{Name: xml.Name{"", "xmlns:ns1"}, Value: "http://www.w3.org/2001/XMLSchema"})
-	// 	output.ArrayType = "ns1:boolean[]"
-	// 	return e.EncodeElement(&output, start)
-	// }
-	// func (a *BoolArray) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	// 	var tok xml.Token
-	// 	for tok, err = d.Token(); err == nil; tok, err = d.Token() {
-	// 		if tok, ok := tok.(xml.StartElement); ok {
-	// 			var item bool
-	// 			if err = d.DecodeElement(&item, &tok); err == nil {
-	// 				*a = append(*a, item)
-	// 			}
-	// 		}
-	// 		if _, ok := tok.(xml.EndElement); ok {
-	// 			break
-	// 		}
-	// 	}
-	// 	return err
-	// }
+	//func (a BoolArray) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	//	var output struct {
+	//		ArrayType string  `xml:"http://schemas.xmlsoap.org/wsdl/ arrayType,attr"`
+	//		Items     []*bool `xml:" item"`
+	//	}
+	//	output.Items = []*bool(a)
+	//	start.Attr = append(start.Attr, xml.Attr{Name: xml.Name{"", "xmlns:ns1"}, Value: "http://www.w3.org/2001/XMLSchema"})
+	//	output.ArrayType = "ns1:boolean[]"
+	//	return e.EncodeElement(&output, start)
+	//}
+	//func (a *BoolArray) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
+	//	var tok xml.Token
+	//	for tok, err = d.Token(); err == nil; tok, err = d.Token() {
+	//		if tok, ok := tok.(xml.StartElement); ok {
+	//			var item *bool
+	//			if err = d.DecodeElement(&item, &tok); err == nil {
+	//				*a = append(*a, item)
+	//			}
+	//		}
+	//		if _, ok := tok.(xml.EndElement); ok {
+	//			break
+	//		}
+	//	}
+	//	return err
+	//}
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 }
 
 func ExampleUseFieldNames() {
@@ -270,75 +537,106 @@ func ExampleUseFieldNames() {
 
 	// Output: package ws
 	//
-	// import (
-	// 	"bytes"
-	// 	"encoding/xml"
-	// 	"time"
-	// )
+	//import (
+	//	"bytes"
+	//	"encoding/json"
+	//	"encoding/xml"
+	//	"time"
+	//)
 	//
-	// type Book struct {
-	// 	Title     string    `xml:"http://www.example.com/ title"`
-	// 	Published time.Time `xml:"http://www.example.com/ published"`
-	// 	Author    string    `xml:"http://www.example.com/ author"`
-	// }
+	//type Book struct {
+	//	Title     *string `xml:"http://www.example.com/ title"`
+	//	Published XsdDate `xml:"http://www.example.com/ published"`
+	//	Author    *string `xml:"http://www.example.com/ author"`
+	//}
 	//
-	// func (t *Book) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	// 	type T Book
-	// 	var layout struct {
-	// 		*T
-	// 		Published *xsdDate `xml:"http://www.example.com/ published"`
-	// 	}
-	// 	layout.T = (*T)(t)
-	// 	layout.Published = (*xsdDate)(&layout.T.Published)
-	// 	return e.EncodeElement(layout, start)
-	// }
-	// func (t *Book) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	// 	type T Book
-	// 	var overlay struct {
-	// 		*T
-	// 		Published *xsdDate `xml:"http://www.example.com/ published"`
-	// 	}
-	// 	overlay.T = (*T)(t)
-	// 	overlay.Published = (*xsdDate)(&overlay.T.Published)
-	// 	return d.DecodeElement(&overlay, &start)
-	// }
+	//type Library struct {
+	//	Book []Book `xml:"http://www.example.com/ book"`
+	//}
 	//
-	// type Library struct {
-	// 	Book []Book `xml:"http://www.example.com/ book"`
-	// }
+	//type XsdDate time.Time
 	//
-	// type xsdDate time.Time
-	//
-	// func (t *xsdDate) UnmarshalText(text []byte) error {
-	// 	return _unmarshalTime(text, (*time.Time)(t), "2006-01-02")
-	// }
-	// func (t xsdDate) MarshalText() ([]byte, error) {
-	// 	return []byte((time.Time)(t).Format("2006-01-02")), nil
-	// }
-	// func (t xsdDate) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	// 	if (time.Time)(t).IsZero() {
-	// 		return nil
-	// 	}
-	// 	m, err := t.MarshalText()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return e.EncodeElement(m, start)
-	// }
-	// func (t xsdDate) MarshalXMLAttr(name xml.Name) (xml.Attr, error) {
-	// 	if (time.Time)(t).IsZero() {
-	// 		return xml.Attr{}, nil
-	// 	}
-	// 	m, err := t.MarshalText()
-	// 	return xml.Attr{Name: name, Value: string(m)}, err
-	// }
-	// func _unmarshalTime(text []byte, t *time.Time, format string) (err error) {
-	// 	s := string(bytes.TrimSpace(text))
-	// 	*t, err = time.Parse(format, s)
-	// 	if _, ok := err.(*time.ParseError); ok {
-	// 		*t, err = time.Parse(format+"Z07:00", s)
-	// 	}
-	// 	return err
-	// }
+	//func (t *XsdDate) UnmarshalText(text []byte) error {
+	//	return _unmarshalTime(text, (*time.Time)(t), "2006-01-02")
+	//}
+	//func (t XsdDate) MarshalText() ([]byte, error) {
+	//	return []byte((time.Time)(t).Format("2006-01-02")), nil
+	//}
+	//func (t XsdDate) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	//	if (time.Time)(t).IsZero() {
+	//		return nil
+	//	}
+	//	m, err := t.MarshalText()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return e.EncodeElement(m, start)
+	//}
+	//func (t XsdDate) MarshalJSON() ([]byte, error) {
+	//	var buf bytes.Buffer
+	//	if (time.Time)(t).IsZero() {
+	//		buf.WriteString("null")
+	//		return buf.Bytes(), nil
+	//	}
+	//	m, err := t.MarshalText()
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	buf.WriteString("\"" + string(m) + "\"")
+	//	return buf.Bytes(), nil
+	//}
+	//func (t XsdDate) MarshalXMLAttr(name xml.Name) (xml.Attr, error) {
+	//	if (time.Time)(t).IsZero() {
+	//		return xml.Attr{}, nil
+	//	}
+	//	m, err := t.MarshalText()
+	//	return xml.Attr{Name: name, Value: string(m)}, err
+	//}
+	//func _unmarshalTime(text []byte, t *time.Time, format string) (err error) {
+	//	s := string(bytes.TrimSpace(text))
+	//	*t, err = time.Parse(format, s)
+	//	if _, ok := err.(*time.ParseError); ok {
+	//		*t, err = time.Parse(format+"Z07:00", s)
+	//	}
+	//	return err
+	//}
+	//func GetInt(value int) *int {
+	//	return &value
+	//}
+	//func GetString(value string) *string {
+	//	return &value
+	//}
+	//func GetFloat64(value float64) *float64 {
+	//	return &value
+	//}
+	//func GetBool(value bool) *bool {
+	//	return &value
+	//}
+	//func GetXsdDateTime(value time.Time) *XsdDateTime {
+	//	convTime := XsdDateTime(value)
+	//	return &convTime
+	//}
+	//func GetXsdDate(value time.Time) *XsdDate {
+	//	convTime := XsdDate(value)
+	//	return &convTime
+	//}
+	//func GetXsdTime(value time.Time) *XsdTime {
+	//	convTime := XsdTime(value)
+	//	return &convTime
+	//}
+	//func (ext *Extensions) UnmarshalJSON(b []byte) error {
+	//	err := json.Unmarshal(b, &ext.InnerXml)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+	//func (ext *Extensions) MarshalJSON() ([]byte, error) {
+	//	buffer := &bytes.Buffer{}
+	//	encoder := json.NewEncoder(buffer)
+	//	encoder.SetEscapeHTML(false)
+	//	err := encoder.Encode(ext.InnerXml)
+	//	return buffer.Bytes(), err
+	//}
 
 }
