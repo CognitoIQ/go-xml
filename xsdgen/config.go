@@ -448,7 +448,7 @@ func (cfg *Config) filterFields(t *xsd.ComplexType) ([]xsd.Attribute, []xsd.Elem
 
 // Return the identifier for non-builtin types, or the Go expression
 // mapped to the built-in type.
-func (cfg *Config) expr(t xsd.Type) (ast.Expr, error) {
+func (cfg *Config) expr(t xsd.Type, nonBuiltinPointer bool) (ast.Expr, error) {
 	if t, ok := t.(xsd.Builtin); ok {
 		ex := builtinExpr(t)
 		if ex == nil {
@@ -456,12 +456,16 @@ func (cfg *Config) expr(t xsd.Type) (ast.Expr, error) {
 		}
 		return ex, nil
 	}
-	return ast.NewIdent(cfg.public(xsd.XMLName(t))), nil
+	prefix := ""
+	if nonBuiltinPointer {
+		prefix += "*"
+	}
+	return ast.NewIdent(prefix + cfg.public(xsd.XMLName(t))), nil
 }
 
 func (cfg *Config) exprString(t xsd.Type) string {
 	var buf bytes.Buffer
-	expr, err := cfg.expr(t)
+	expr, err := cfg.expr(t, false)
 	if err != nil {
 		return ""
 	}

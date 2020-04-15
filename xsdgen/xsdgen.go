@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/token"
 	"io"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -679,7 +680,7 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 			}
 			base = xsd.Base(base)
 		}
-		expr, err := cfg.expr(base)
+		expr, err := cfg.expr(base, false)
 		if err != nil {
 			return nil, fmt.Errorf("%s base type %s: %v",
 				t.Name.Local, xsd.XMLName(t.Base).Local, err)
@@ -772,7 +773,7 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 		if jsonOptions != "" {
 			tag += fmt.Sprintf(` json:"%s"`, jsonOptions)
 		}
-		base, err := cfg.expr(attr.Type)
+		base, err := cfg.expr(attr.Type, false)
 		if err != nil {
 			return nil, fmt.Errorf("%s attribute %s: %v", t.Name.Local, attr.Name.Local, err)
 		}
@@ -810,7 +811,10 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 			jsonOptions = ",omitempty"
 		}
 		tag := fmt.Sprintf(`xml:"%s %s%s"`, el.Name.Space, el.Name.Local, options)
-		base, err := cfg.expr(el.Type)
+
+		nonBuiltinPointer := (reflect.TypeOf(el.Type).String() == "*xsd.ComplexType") && !el.Plural
+
+		base, err := cfg.expr(el.Type, nonBuiltinPointer)
 		if err != nil {
 			return nil, fmt.Errorf("%s element %s: %v", t.Name.Local, el.Name.Local, err)
 		}
@@ -972,7 +976,7 @@ func (cfg *Config) genSimpleType(t *xsd.SimpleType) ([]spec, error) {
 		})
 		return result, nil
 	}
-	base, err := cfg.expr(t.Base)
+	base, err := cfg.expr(t.Base, false)
 	if err != nil {
 		return nil, fmt.Errorf("simpleType %s: base type %s: %v",
 			t.Name.Local, xsd.XMLName(t.Base).Local, err)
@@ -1057,7 +1061,7 @@ func (cfg *Config) addTokenListMethods(s spec, t *xsd.SimpleType) (spec, error) 
 // methods.
 func (cfg *Config) genSimpleListSpec(t *xsd.SimpleType) ([]spec, error) {
 	cfg.debugf("generating Go source for simple list %q", xsd.XMLName(t).Local)
-	expr, err := cfg.expr(t.Base)
+	expr, err := cfg.expr(t.Base, false)
 	if err != nil {
 		return nil, err
 	}
