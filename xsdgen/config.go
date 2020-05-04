@@ -448,18 +448,21 @@ func (cfg *Config) filterFields(t *xsd.ComplexType) ([]xsd.Attribute, []xsd.Elem
 
 // Return the identifier for non-builtin types, or the Go expression
 // mapped to the built-in type.
-func (cfg *Config) expr(t xsd.Type, nonBuiltinPointer bool) (ast.Expr, error) {
+func (cfg *Config) expr(t xsd.Type, pointer bool) (ast.Expr, error) {
 	if t, ok := t.(xsd.Builtin); ok {
-		ex := builtinExpr(t)
+		ex := builtinExpr(t, pointer)
 		if ex == nil {
 			return nil, fmt.Errorf("Unknown built-in type %q", t.Name().Local)
 		}
 		return ex, nil
 	}
 	prefix := ""
-	if nonBuiltinPointer {
+	if pointer {
 		prefix += "*"
 	}
+	if xsd.XMLName(t).Local == "ShortRef" {
+    prefix = ""
+  }
 	return ast.NewIdent(prefix + cfg.public(xsd.XMLName(t))), nil
 }
 
@@ -623,16 +626,21 @@ func (cfg *Config) addStandardHelpers() {
 		cfg.helperFuncs[fn.Name()] = fn.MustDecl()
 	}
 
+	type timeformatOffset struct {
+    formatUnarshal string
+	  formatMarshal string
+	  offset string
+  }
 	cfg.helperTypes = make(map[xml.Name]spec)
-	timeTypes := map[xsd.Builtin]string{
-		xsd.Date:       "2006-01-02",
-		xsd.DateTime:   "2006-01-02T15:04:05.999999999",
-		xsd.GDay:       "---02",
-		xsd.GMonth:     "--01",
-		xsd.GMonthDay:  "--01-02",
-		xsd.GYear:      "2006",
-		xsd.GYearMonth: "2006-01",
-		xsd.Time:       "15:04:05.999999999",
+	timeTypes := map[xsd.Builtin]timeformatOffset{
+		xsd.Date:       {formatUnarshal: "2006-01-02", formatMarshal: "2006-01-02", offset: ""},
+		xsd.DateTime:   {formatUnarshal: "2006-01-02T15:04:05.999999999", formatMarshal: "2006-01-02T15:04:05.999", offset: "Z07:00"},
+		xsd.GDay:       {formatUnarshal: "---02", formatMarshal: "---02", offset: ""},
+		xsd.GMonth:     {formatUnarshal: "--01", formatMarshal: "--01", offset: ""},
+		xsd.GMonthDay:  {formatUnarshal: "--01-02", formatMarshal: "--01-02", offset: ""},
+		xsd.GYear:      {formatUnarshal: "2006", formatMarshal: "2006", offset: ""},
+		xsd.GYearMonth: {formatUnarshal: "2006-01", formatMarshal: "2006-01", offset: ""},
+		xsd.Time:       {formatUnarshal: "15:04:05.999999999", formatMarshal: "15:04:05.999", offset: "Z07:00"},
 	}
 
 	for timeType, timeSpec := range timeTypes {
@@ -641,7 +649,7 @@ func (cfg *Config) addStandardHelpers() {
 
 		cfg.helperTypes[xsd.XMLName(timeType)] = spec{
 			name:    name,
-			expr:    builtinExpr(timeType),
+			expr:    builtinExpr(timeType, false),
 			private: true,
 			xsdType: timeType,
 			methods: []*ast.FuncDecl{
@@ -649,12 +657,12 @@ func (cfg *Config) addStandardHelpers() {
 					Receiver("t *"+name).
 					Args("text []byte").
 					Returns("error").
-					Body(`return _unmarshalTime(text, (*time.Time)(t), %q)`, timeSpec).
+					Body(`return _unmarshalTime(text, (*time.Time)(t), %q)`, timeSpec.formatUnarshal).
 					MustDecl(),
 				gen.Func("MarshalText").
 					Receiver("t "+name).
 					Returns("[]byte", "error").
-					Body(`return []byte((time.Time)(t).Format(%q)), nil`, timeSpec).
+					Body(`return []byte((time.Time)(t).Format(%q)), nil`, timeSpec.formatMarshal + timeSpec.offset).
 					MustDecl(),
 				// workaround golang.org/issues/11939
 				gen.Func("MarshalXML").
@@ -706,7 +714,7 @@ func (cfg *Config) addStandardHelpers() {
 
 	cfg.helperTypes[xsd.XMLName(xsd.HexBinary)] = spec{
 		name:    "xsd" + xsd.HexBinary.String(),
-		expr:    builtinExpr(xsd.HexBinary),
+		expr:    builtinExpr(xsd.HexBinary, false),
 		private: true,
 		xsdType: xsd.HexBinary,
 		methods: []*ast.FuncDecl{
@@ -732,7 +740,7 @@ func (cfg *Config) addStandardHelpers() {
 
 	cfg.helperTypes[xsd.XMLName(xsd.Base64Binary)] = spec{
 		name:    "xsd" + xsd.Base64Binary.String(),
-		expr:    builtinExpr(xsd.Base64Binary),
+		expr:    builtinExpr(xsd.Base64Binary, false),
 		private: true,
 		xsdType: xsd.Base64Binary,
 		methods: []*ast.FuncDecl{

@@ -1,21 +1,27 @@
 package xsdgen // import "github.com/CognitoIQ/go-xml/xsdgen"
 
 import (
-	"bytes"
-	"encoding/xml"
-	"fmt"
-	"go/ast"
-	"go/token"
-	"io"
-	"reflect"
-	"sort"
-	"strconv"
-	"strings"
+  "bytes"
+  "encoding/xml"
+  "fmt"
+  "go/ast"
+  "go/token"
+  "io"
+  "sort"
+  "strconv"
+  "strings"
 
-	"github.com/CognitoIQ/go-xml/internal/dependency"
-	"github.com/CognitoIQ/go-xml/internal/gen"
-	"github.com/CognitoIQ/go-xml/xmltree"
-	"github.com/CognitoIQ/go-xml/xsd"
+  "github.com/CognitoIQ/go-xml/internal/dependency"
+  "github.com/CognitoIQ/go-xml/internal/gen"
+  "github.com/CognitoIQ/go-xml/xmltree"
+  "github.com/CognitoIQ/go-xml/xsd"
+)
+
+var (
+  //hard coding the types we need the TAMS JSON root property for, until we can figure this out automatically
+  tamsRootEntities = []string{"Notification", "NotificationState", "NotificationEvent", "InvItemState", "InvItem", "InvList", "InvListState"}
+  tamsSimpleTypes = []string{"ShortRef"}
+  tamsNamespace = "http://www.cognitomobile.com/schemas/FieldForceIQ/1.0/TAMS"
 )
 
 type orderedStringMap interface {
@@ -98,7 +104,7 @@ func (c *Code) NameOf(name xml.Name) string {
 	}
 
 	if b, err := xsd.ParseBuiltin(name); err == nil {
-		s, err := gen.ToString(builtinExpr(b))
+		s, err := gen.ToString(builtinExpr(b, false))
 		if err != nil {
 			return "ERROR" + name.Local
 		}
@@ -266,6 +272,11 @@ func (code *Code) GenAST() (*ast.File, error) {
 			Returns("* string").
 			Body("return &value").
 			MustDecl(),
+    gen.Func("GetShortRef").
+      Args("value string").
+      Returns("ShortRef").
+      Body("return &value").
+      MustDecl(),
 		gen.Func("GetFloat64").
 			//Receiver("t *"+name).
 			Args("value float64").
@@ -278,7 +289,14 @@ func (code *Code) GenAST() (*ast.File, error) {
 			Returns("* bool").
 			Body("return &value").
 			MustDecl(),
-		gen.Func("GetXsdDateTime").
+    //gen.Func("GetShortRef").
+    //  //Receiver("t *"+name).
+    //  Args("value string").
+    //  Returns("* ShortRef").
+    //    Body(`convStr := ShortRef(value)
+	  //    return &convStr`).
+    //  MustDecl(),
+    gen.Func("GetXsdDateTime").
 			//Receiver("t *"+name).
 			Args("value time.Time").
 			Returns("* XsdDateTime").
@@ -311,20 +329,55 @@ func (code *Code) GenAST() (*ast.File, error) {
 			MustDecl(),
 		gen.Func("MarshalJSON").
 			Receiver("ext *Extensions").
-			//Args("text []byte").
 			Returns("[]byte", "error").
-			Body(`buffer := &bytes.Buffer{}
+			Body(`return encodeJSONNoHTMLEscape(&ext.InnerXml)`).
+			MustDecl(),
+    gen.Func("encodeJSONNoHTMLEscape").
+      Args("v interface{}").
+      Returns("[]byte", "error").
+        Body(`buffer := &bytes.Buffer{}
         encoder := json.NewEncoder(buffer)
         encoder.SetEscapeHTML(false)
-        err := encoder.Encode(ext.InnerXml)
+        err := encoder.Encode(&v)
         return buffer.Bytes(), err`).
-			MustDecl(),
+      MustDecl(),
+
 	}
 
 	for _, meth := range miscMethods {
 		file.Decls = append(file.Decls, meth)
-
 	}
+
+
+  for _, rootPropTye := range tamsRootEntities {
+    file.Decls = append(file.Decls,
+      gen.Func("MarshalJSON").
+        Receiver(fmt.Sprintf("t %s", rootPropTye)).
+        Returns("[]byte", "error").
+          Body(fmt.Sprintf(`type Alias %s
+          wrapped := map[string]interface{}{
+            "%s": (Alias)(t),
+          }
+          return encodeJSONNoHTMLEscape(&wrapped)`, rootPropTye, rootPropTye)).MustDecl())
+
+    file.Decls = append(file.Decls,
+      gen.Func("UnmarshalJSON").
+        Args("data []byte").
+        Receiver(fmt.Sprintf("t *%s", rootPropTye)).
+        Returns("error").
+          Body(fmt.Sprintf(`type Alias %[1]s
+          wrapperPropertyCheck := struct{ %[1]s *bool }{}
+	        err := json.Unmarshal(data, &wrapperPropertyCheck)
+
+          if wrapperPropertyCheck.%[1]s != nil {
+            aux := &struct{%[1]s *Alias }{%[1]s: (*Alias)(t)}
+            err = json.Unmarshal(data, &aux)
+          } else {
+            err = json.Unmarshal(data, (*Alias)(t))
+          }
+          
+          return err`, rootPropTye)).MustDecl())
+  }
 
 	pkgname := code.cfg.pkgname
 	if pkgname == "" {
@@ -661,6 +714,9 @@ func (gen *nameGenerator) element(base xml.Name) ast.Expr {
 	return gen.unique(name)
 }
 
+func addXMLName(fields []ast.Expr, complexTypeName string) {
+
+}
 func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 	var result []spec
 	var fields []ast.Expr
@@ -669,59 +725,18 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 
 	namegen := nameGenerator{cfg, make(map[string]struct{})}
 
-	if t.Mixed {
-		// For complex types with mixed content models, we must drill
-		// down to the base simple or builtin type to determine the
-		// ",chardata" struct field.
-		base := xsd.Base(t)
-		for xsd.Base(base) != nil {
-			if _, ok := base.(*xsd.SimpleType); ok {
-				break
-			}
-			base = xsd.Base(base)
-		}
-		expr, err := cfg.expr(base, false)
-		if err != nil {
-			return nil, fmt.Errorf("%s base type %s: %v",
-				t.Name.Local, xsd.XMLName(t.Base).Local, err)
-		}
-		switch b := base.(type) {
-		case *xsd.SimpleType:
-			cfg.debugf("complexType %[1]s extends simpleType %[2]s. Naming"+
-				" the chardata struct field after %[2]s", t.Name.Local, b.Name.Local)
-			fields = append(fields, expr, expr, gen.String(`xml:",chardata"`))
-		case xsd.Builtin:
-			if b == xsd.AnyType {
-				// extending anyType doesn't really make sense, but
-				// we can just ignore it.
-				cfg.debugf("complexType %s: don't know how to extend anyType, ignoring",
-					t.Name.Local)
-				break
-			}
-			// Name the field after the xsd type name.
-			cfg.debugf("complexType %[1]s extends %[2]s, naming chardata struct field %[2]s",
-				t.Name.Local, b)
-			name := "Value"
-			tag := `xml:",chardata"`
-			if nonTrivialBuiltin(b) {
-				h, ok := cfg.helperTypes[xsd.XMLName(b)]
-				if !ok {
-					return nil, fmt.Errorf("missing helper type for %v", b)
-				}
-				helperTypes = append(helperTypes, xsd.XMLName(h.xsdType))
-				overrides = append(overrides, fieldOverride{
-					FieldName: name,
-					FromType:  cfg.exprString(b),
-					Tag:       tag,
-					ToType:    h.name,
-					Type:      b,
-				})
-			}
-			fields = append(fields, namegen.unique(name), expr, gen.String(tag))
-		default:
-			panic(fmt.Errorf("%s does not derive from a builtin type", t.Name.Local))
-		}
-	}
+	//add the initial XMLName field if root entity.
+	//at the moment just using the hardcoded list to determine whether it's a root entity
+  for _, e := range tamsRootEntities {
+    if e == t.Name.Local {
+      xmlNameExpr := &ast.Ident{Name: "xml.Name"}
+      tagForXmlName := fmt.Sprintf(`xml:"%s %s" json:"-"`, tamsNamespace, t.Name.Local)
+      fields = append(fields, namegen.unique("XMLName"), xmlNameExpr, gen.String(tagForXmlName))
+      break
+    }
+  }
+
+
 
 	// When restricting a complex type, all attributes are "inherited" from
 	// the base type (but not elements!). In addition, any <xs:any> elements,
@@ -754,10 +769,12 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 	for _, attr := range attributes {
 		options := ""
 		jsonOptions := ""
-		if attr.Optional {
-			options = ",omitempty"
-			jsonOptions = ",omitempty"
-		}
+
+		//setting omit empty for everything for now, until we can detect here whether an element was part of a choice XSD construct
+		//if attr.Optional {
+		options = ",omitempty"
+		jsonOptions = ",omitempty"
+		//}
 		qualified := false
 		for _, attrAttr := range attr.Attr {
 			if attrAttr.Name.Space == "" && attrAttr.Name.Local == "form" && attrAttr.Value == "qualified" {
@@ -770,10 +787,10 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 		} else {
 			tag = fmt.Sprintf(`xml:"%s,attr%s"`, attr.Name.Local, options)
 		}
-		if jsonOptions != "" {
-			tag += fmt.Sprintf(` json:"%s"`, jsonOptions)
-		}
-		base, err := cfg.expr(attr.Type, false)
+		tag += fmt.Sprintf(` json:"@%s%s"`, attr.Name.Local, jsonOptions)
+
+		//setting everything to pointers for now until we can detect here whether an element was part of a choice XSD construct
+		base, err := cfg.expr(attr.Type, true)
 		if err != nil {
 			return nil, fmt.Errorf("%s attribute %s: %v", t.Name.Local, attr.Name.Local, err)
 		}
@@ -790,7 +807,9 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 				typeName = h.name
 				helperTypes = append(helperTypes, xsd.XMLName(attr.Type))
 			}
-			base = &ast.Ident{Name: typeName} //instead of using overrides, just set the type directly
+			//2nd way of setting the type (not great)
+			// setting all as pointers for now until we can detect here whether an element was part of a choice XSD construct
+			base = &ast.Ident{Name: "*" + typeName} //instead of using overrides, just set the type directly
 			//overrides = append(overrides, fieldOverride{
 			//	DefaultValue: attr.Default,
 			//	FieldName:    name.(*ast.Ident).Name,
@@ -803,18 +822,76 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 		fields = append(fields, name, base, gen.String(tag))
 	}
 
+  if t.Mixed {
+    // For complex types with mixed content models, we must drill
+    // down to the base simple or builtin type to determine the
+    // ",chardata" struct field.
+    base := xsd.Base(t)
+    for xsd.Base(base) != nil {
+      if _, ok := base.(*xsd.SimpleType); ok {
+        break
+      }
+      base = xsd.Base(base)
+    }
+
+    //setting as a pointer for everything for now, until we can detect here whether an element was part of a choice XSD construct
+    expr, err := cfg.expr(base, true)
+    if err != nil {
+      return nil, fmt.Errorf("%s base type %s: %v",
+        t.Name.Local, xsd.XMLName(t.Base).Local, err)
+    }
+    switch b := base.(type) {
+    case *xsd.SimpleType:
+      cfg.debugf("complexType %[1]s extends simpleType %[2]s. Naming"+
+          " the chardata struct field after %[2]s", t.Name.Local, b.Name.Local)
+      fields = append(fields, expr, expr, gen.String(`xml:",chardata"`))
+    case xsd.Builtin:
+      if b == xsd.AnyType {
+        // extending anyType doesn't really make sense, but
+        // we can just ignore it.
+        cfg.debugf("complexType %s: don't know how to extend anyType, ignoring",
+          t.Name.Local)
+        break
+      }
+      // Name the field after the xsd type name.
+      cfg.debugf("complexType %[1]s extends %[2]s, naming chardata struct field %[2]s",
+        t.Name.Local, b)
+      name := "Value"
+      tag := `xml:",chardata"`
+      if nonTrivialBuiltin(b) {
+        h, ok := cfg.helperTypes[xsd.XMLName(b)]
+        if !ok {
+          return nil, fmt.Errorf("missing helper type for %v", b)
+        }
+        helperTypes = append(helperTypes, xsd.XMLName(h.xsdType))
+        overrides = append(overrides, fieldOverride{
+          FieldName: name,
+          FromType:  cfg.exprString(b),
+          Tag:       tag,
+          ToType:    h.name,
+          Type:      b,
+        })
+      }
+      fields = append(fields, namegen.unique(name), expr, gen.String(tag))
+    default:
+      panic(fmt.Errorf("%s does not derive from a builtin type", t.Name.Local))
+    }
+  }
+
 	for _, el := range elements {
 		options := ""
 		jsonOptions := ""
-		if el.Nillable || el.Optional {
-			options = ",omitempty"
-			jsonOptions = ",omitempty"
-		}
-		tag := fmt.Sprintf(`xml:"%s %s%s"`, el.Name.Space, el.Name.Local, options)
+		//setting omit empty for everything for now, until we can detect here whether an element was part of a choice XSD construct
+		//if el.Nillable || el.Optional {
+		options = ",omitempty"
+		jsonOptions = ",omitempty"
+		//}
+		tag := fmt.Sprintf(`xml:"%s%s"`, el.Name.Local, options)
+    //tag := fmt.Sprintf(`xml:"%s %s%s"`, el.Name.Space, el.Name.Local, options)
 
-		nonBuiltinPointer := (reflect.TypeOf(el.Type).String() == "*xsd.ComplexType") && !el.Plural
-
-		base, err := cfg.expr(el.Type, nonBuiltinPointer)
+		//nonBuiltinPointer := (reflect.TypeOf(el.Type).String() == "*xsd.ComplexType") && !el.Plural
+		//apart from array types, setting all as pointers for now until we can detect here whether an element was part of a choice XSD construct
+		base, err := cfg.expr(el.Type, !el.Plural)
 		if err != nil {
 			return nil, fmt.Errorf("%s element %s: %v", t.Name.Local, el.Name.Local, err)
 		}
@@ -828,7 +905,7 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 			}
 			if b, ok := el.Type.(xsd.Builtin); ok && b == xsd.AnyType {
 				cfg.debugf("complexType %s: defaulting wildcard element to []string", t.Name.Local)
-				base = builtinExpr(xsd.String)
+				base = builtinExpr(xsd.String, false)
 			}
 		}
 		if jsonOptions != "" {
@@ -848,7 +925,9 @@ func (cfg *Config) genComplexType(t *xsd.ComplexType) ([]spec, error) {
 				helperTypes = append(helperTypes, xsd.XMLName(h.xsdType))
 				typeName = h.name
 			}
-			base = &ast.Ident{Name: typeName} //instead of using overrides, just set the type directly
+			//2nd way of setting the type (not great)
+			// setting all as pointers for now until we can detect here whether an element was part of a choice XSD construct
+			base = &ast.Ident{Name: "*" + typeName} //instead of using overrides, just set the type directly
 			//overrides = append(overrides, fieldOverride{
 			//	DefaultValue: el.Default,
 			//	FieldName:    name.(*ast.Ident).Name,
@@ -959,7 +1038,8 @@ func (cfg *Config) genComplexTypeMethods(t *xsd.ComplexType, overrides []fieldOv
 }
 
 func (cfg *Config) genSimpleType(t *xsd.SimpleType) ([]spec, error) {
-	var result []spec
+
+  var result []spec
 	if t.List {
 		return cfg.genSimpleListSpec(t)
 	}
@@ -971,12 +1051,21 @@ func (cfg *Config) genSimpleType(t *xsd.SimpleType) ([]spec, error) {
 		result = append(result, spec{
 			doc:     t.Doc,
 			name:    cfg.public(t.Name),
-			expr:    builtinExpr(xsd.String),
+			expr:    builtinExpr(xsd.String, true),
 			xsdType: t,
 		})
 		return result, nil
 	}
-	base, err := cfg.expr(t.Base, false)
+
+  pointer := false;
+  for _, e := range tamsSimpleTypes {
+    if e == t.Name.Local {
+      pointer = true
+      break
+    }
+  }
+
+	base, err := cfg.expr(t.Base, pointer)
 	if err != nil {
 		return nil, fmt.Errorf("simpleType %s: base type %s: %v",
 			t.Name.Local, xsd.XMLName(t.Base).Local, err)
@@ -1119,7 +1208,7 @@ func (cfg *Config) genSimpleListSpec(t *xsd.SimpleType) ([]spec, error) {
 				}
 				*x = append(*x, t)
 			}
-		`, builtinExpr(base.(xsd.Builtin)).(*ast.Ident).Name)
+		`, builtinExpr(base.(xsd.Builtin), false).(*ast.Ident).Name)
 	case xsd.Long:
 		marshalFn = marshalFn.Body(`
 			result := make([][]byte, 0, len(*x))
