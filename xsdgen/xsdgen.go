@@ -349,35 +349,35 @@ func (code *Code) GenAST() (*ast.File, error) {
 	}
 
 
-  for _, rootPropTye := range tamsRootEntities {
-    file.Decls = append(file.Decls,
-      gen.Func("MarshalJSON").
-        Receiver(fmt.Sprintf("t %s", rootPropTye)).
-        Returns("[]byte", "error").
-          Body(fmt.Sprintf(`type Alias %s
-          wrapped := map[string]interface{}{
-            "%s": (Alias)(t),
-          }
-          return encodeJSONNoHTMLEscape(&wrapped)`, rootPropTye, rootPropTye)).MustDecl())
-
-    file.Decls = append(file.Decls,
-      gen.Func("UnmarshalJSON").
-        Args("data []byte").
-        Receiver(fmt.Sprintf("t *%s", rootPropTye)).
-        Returns("error").
-          Body(fmt.Sprintf(`type Alias %[1]s
-          wrapperPropertyCheck := struct{ %[1]s *bool }{}
-	        err := json.Unmarshal(data, &wrapperPropertyCheck)
-
-          if wrapperPropertyCheck.%[1]s != nil {
-            aux := &struct{%[1]s *Alias }{%[1]s: (*Alias)(t)}
-            err = json.Unmarshal(data, &aux)
-          } else {
-            err = json.Unmarshal(data, (*Alias)(t))
-          }
-          
-          return err`, rootPropTye)).MustDecl())
-  }
+  //for _, rootPropTye := range tamsRootEntities {
+  //  file.Decls = append(file.Decls,
+  //    gen.Func("MarshalJSON").
+  //      Receiver(fmt.Sprintf("t %s", rootPropTye)).
+  //      Returns("[]byte", "error").
+  //        Body(fmt.Sprintf(`type Alias %s
+  //        wrapped := map[string]interface{}{
+  //          "%s": (Alias)(t),
+  //        }
+  //        return encodeJSONNoHTMLEscape(&wrapped)`, rootPropTye, rootPropTye)).MustDecl())
+  //
+  //  file.Decls = append(file.Decls,
+  //    gen.Func("UnmarshalJSON").
+  //      Args("data []byte").
+  //      Receiver(fmt.Sprintf("t *%s", rootPropTye)).
+  //      Returns("error").
+  //        Body(fmt.Sprintf(`type Alias %[1]s
+  //        wrapperPropertyCheck := struct{ %[1]s *bool }{}
+	//        err := json.Unmarshal(data, &wrapperPropertyCheck)
+  //
+  //        if wrapperPropertyCheck.%[1]s != nil {
+  //          aux := &struct{%[1]s *Alias }{%[1]s: (*Alias)(t)}
+  //          err = json.Unmarshal(data, &aux)
+  //        } else {
+  //          err = json.Unmarshal(data, (*Alias)(t))
+  //        }
+  //
+  //        return err`, rootPropTye)).MustDecl())
+  //}
 
 	pkgname := code.cfg.pkgname
 	if pkgname == "" {
