@@ -332,6 +332,17 @@ func (code *Code) GenAST() (*ast.File, error) {
 			Returns("[]byte", "error").
 			Body(`return encodeJSONNoHTMLEscape(&ext.InnerXml)`).
 			MustDecl(),
+    gen.Func("UnmarshalDynamoDBAttributeValue").
+      Receiver("ext *Extensions").
+      Args("av *dynamodb.AttributeValue").
+      Returns("error").
+      Body(`if av.S != nil {
+    return dynamodbattribute.NewDecoder().Decode(av, &ext.InnerXml)
+  }
+    type Alias Extensions
+    aext := (*Alias)(ext)
+    return dynamodbattribute.NewDecoder().Decode(av, aext)`).
+      MustDecl(),
     gen.Func("encodeJSONNoHTMLEscape").
       Args("v interface{}").
       Returns("[]byte", "error").
